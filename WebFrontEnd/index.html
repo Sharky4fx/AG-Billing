@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>AG‑Billing — Login</title>
+    <style>
+        :root{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;line-height:1.4}
+        body{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:1rem;background:#f7f8fb}
+        .card{width:100%;max-width:420px;background:#fff;border-radius:8px;box-shadow:0 6px 18px rgba(20,20,40,.06);padding:1.5rem}
+        h1{margin:0 0 1rem;font-size:1.25rem}
+        label{display:block;font-size:.9rem;margin-bottom:.25rem}
+        input[type="email"],input[type="password"]{width:100%;padding:.6rem .75rem;border:1px solid #d7dbe6;border-radius:6px;margin-bottom:.75rem}
+        button{display:inline-block;padding:.6rem .9rem;background:#0066cc;color:#fff;border:none;border-radius:6px;cursor:pointer}
+        .muted{color:#6b7280;font-size:.9rem;margin-top:.75rem}
+        a{color:#0066cc;text-decoration:none}
+        .note{background:#eef6ff;border-left:3px solid #cfe9ff;padding:.6rem;border-radius:4px;margin-top:.75rem}
+    </style>
+</head>
+<body>
+    <main class="card" role="main">
+        <h1>Sign in</h1>
+
+        <form id="loginForm" novalidate>
+            <label for="email">Email</label>
+            <input id="email" name="email" type="email" autocomplete="email" required />
+
+            <label for="password">Password</label>
+            <input id="password" name="password" type="password" autocomplete="current-password" required />
+
+            <div style="display:flex;gap:.5rem;align-items:center">
+                <button type="submit">Sign in</button>
+                <div id="loginStatus" aria-live="polite" style="margin-left:.5rem;color:#6b7280;font-size:.9rem"></div>
+            </div>
+        </form>
+
+        <p class="muted">Don't have an account? <a href="register.html">Create one</a></p>
+
+        <div class="note" aria-hidden="true">
+            This front end calls your Function App's API endpoints. Configure CORS and the API URL when testing.
+        </div>
+    </main>
+
+    <script>
+        // Minimal placeholder: integrate with your real login endpoint later.
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const status = document.getElementById('loginStatus');
+            status.textContent = 'Login not implemented in this frontend';
+        });
+    </script>
+</body>
+</html>
