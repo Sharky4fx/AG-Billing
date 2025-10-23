@@ -124,7 +124,7 @@ WHERE Email = @email;";
             return new UserCredentials(userId, uuid, userEmail, passwordHash, passwordSalt, algorithm, verified, active);
         }
 
-        public async Task<bool> VerifyEmailAsync(int userId, string tokenHash)
+        public async Task<bool> VerifyEmailAsync(Guid userUuid, string tokenHash)
         {
             await using var conn = new SqlConnection(_connectionString);
             await conn.OpenAsync();
@@ -133,21 +133,23 @@ WHERE Email = @email;";
 
             try
             {
-                // Check token validity and expiration
+                // Check token validity and expiration, capture numeric user id
                 const string checkTokenSql = @"
-SELECT 1
-FROM auth.VerificationTokens
-WHERE UserId = @userId 
-    AND Token = @tokenHash 
-    AND ExpiresAt > SYSUTCDATETIME();";
+SELECT u.Id
+FROM auth.Users u
+INNER JOIN auth.VerificationTokens vt ON u.Id = vt.UserId
+WHERE u.Uuid = @userUuid
+    AND vt.Token = @tokenHash 
+    AND vt.ExpiresAt > SYSUTCDATETIME();";
 
+                int userId;
                 await using (var checkCmd = new SqlCommand(checkTokenSql, conn, tx))
                 {
-                    checkCmd.Parameters.Add(new SqlParameter("@userId", SqlDbType.Int) { Value = userId });
+                    checkCmd.Parameters.Add(new SqlParameter("@userUuid", SqlDbType.UniqueIdentifier) { Value = userUuid });
                     checkCmd.Parameters.Add(new SqlParameter("@tokenHash", SqlDbType.NVarChar, 255) { Value = tokenHash });
 
                     var result = await checkCmd.ExecuteScalarAsync();
-                    if (result == null || result == DBNull.Value)
+                    if (result == null || result == DBNull.Value || !int.TryParse(result.ToString(), out userId))
                     {
                         throw new InvalidVerificationTokenException();
                     }

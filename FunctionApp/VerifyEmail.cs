@@ -27,10 +27,10 @@ public class VerifyEmail
     {
         _logger.LogInformation("VerifyEmail function processing a request.");
 
-        // Get userId and token from query string
-        if (!int.TryParse(req.Query["userId"], out var userId))
+        // Get user UUID and token from query string
+        if (!Guid.TryParse(req.Query["uuid"], out var userUuid))
         {
-            return new BadRequestObjectResult(new { error = "Invalid or missing user ID" });
+            return new BadRequestObjectResult(new { error = "Invalid or missing user UUID" });
         }
 
         var token = req.Query["token"].ToString();
@@ -41,7 +41,8 @@ public class VerifyEmail
 
         try
         {
-            await _repo.VerifyEmailAsync(userId, token);
+            var tokenHash = HashToken(token);
+            await _repo.VerifyEmailAsync(userUuid, tokenHash);
             
             return new OkObjectResult(new { 
                 verified = true,
@@ -56,11 +57,25 @@ public class VerifyEmail
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error verifying email for user {userId}", userId);
+            _logger.LogError(ex, "Error verifying email for user {userUuid}", userUuid);
             return new ObjectResult(new { error = "Internal server error" }) 
             { 
                 StatusCode = StatusCodes.Status500InternalServerError 
             };
         }
+    }
+
+    private static string HashToken(string token)
+    {
+        using var sha = SHA256.Create();
+        var bytes = Encoding.UTF8.GetBytes(token);
+        var hash = sha.ComputeHash(bytes);
+        var sb = new StringBuilder(hash.Length * 2);
+        foreach (var b in hash)
+        {
+            sb.Append(b.ToString("x2"));
+        }
+
+        return sb.ToString();
     }
 }

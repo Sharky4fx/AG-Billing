@@ -49,7 +49,7 @@ namespace AGRechnung.FunctionApp.Tests
         public async Task VerifyEmail_ReturnsOk_WhenTokenValid()
         {
             var repoMock = new Mock<IAuthRepository>();
-            repoMock.Setup(r => r.VerifyEmailAsync(It.IsAny<int>(), It.IsAny<string>()))
+            repoMock.Setup(r => r.VerifyEmailAsync(It.IsAny<Guid>(), It.IsAny<string>()))
                 .ReturnsAsync(true);
 
             var logger = NullLogger<AGRechnung.VerifyEmail.VerifyEmail>.Instance;
@@ -57,19 +57,22 @@ namespace AGRechnung.FunctionApp.Tests
 
             var context = new DefaultHttpContext();
             var req = context.Request;
-            req.QueryString = new QueryString("?userId=123&token=abc123");
+            var userUuid = Guid.NewGuid();
+            req.QueryString = new QueryString($"?uuid={userUuid}&token=abc123");
 
             var result = await func.Run(req);
 
             Assert.IsType<OkObjectResult>(result);
-            repoMock.Verify(r => r.VerifyEmailAsync(123, It.IsAny<string>()), Times.Once);
+            repoMock.Verify(r => r.VerifyEmailAsync(
+                userUuid,
+                It.Is<string>(hash => hash.Length == 64)), Times.Once);
         }
 
         [Fact]
         public async Task VerifyEmail_ReturnsBadRequest_WhenTokenInvalid()
         {
             var repoMock = new Mock<IAuthRepository>();
-            repoMock.Setup(r => r.VerifyEmailAsync(It.IsAny<int>(), It.IsAny<string>()))
+            repoMock.Setup(r => r.VerifyEmailAsync(It.IsAny<Guid>(), It.IsAny<string>()))
                 .ThrowsAsync(new AGRechnung.FunctionApp.Repositories.InvalidVerificationTokenException());
 
             var logger = NullLogger<AGRechnung.VerifyEmail.VerifyEmail>.Instance;
@@ -77,7 +80,7 @@ namespace AGRechnung.FunctionApp.Tests
 
             var context = new DefaultHttpContext();
             var req = context.Request;
-            req.QueryString = new QueryString("?userId=123&token=invalid");
+            req.QueryString = new QueryString($"?uuid={Guid.NewGuid()}&token=invalid");
 
             var result = await func.Run(req);
 

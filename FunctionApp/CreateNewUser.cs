@@ -66,11 +66,17 @@ public class CreateNewUser
             return new BadRequestObjectResult(new { error = "Password must be at least 8 characters" });
         }
 
+        // Normalize input email for validation and uniqueness checks
+        email = email.Trim();
+
         var emailValidator = new EmailAddressAttribute();
         if (!emailValidator.IsValid(email))
         {
             return new BadRequestObjectResult(new { error = "Invalid email format" });
         }
+
+        // Best-practice normalization for uniqueness: lowercase and trimmed
+        var normalizedEmail = email.ToLowerInvariant();
 
         var (passwordHash, passwordSalt, passwordAlgorithm) = PasswordHasher.HashPassword(password);
 
@@ -82,14 +88,14 @@ public class CreateNewUser
         try
         {
             var newUserId = await _repo.CreateUserWithVerificationTokenAsync(
-                email,
+                normalizedEmail,
                 passwordHash,
                 passwordSalt,
                 passwordAlgorithm,
                 tokenHash,
                 expiresAt);
-            // Log raw token (will later be sent via Azure Communication)
-            _logger.LogInformation("Verification token for {email}: {token}", email, token);
+            // Do not log the raw token; just indicate that the token was generated
+            _logger.LogInformation("Verification token generated for {email}", normalizedEmail);
             return new ObjectResult(new { created = true, userId = newUserId }) { StatusCode = StatusCodes.Status201Created };
         }
         catch (AGRechnung.FunctionApp.Repositories.EmailAlreadyExistsException)

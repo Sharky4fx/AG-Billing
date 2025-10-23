@@ -48,7 +48,7 @@ namespace AGRechnung.FunctionApp.Repositories
         /// Verifies a user's email using the provided token.
         /// Returns true on success, throws InvalidVerificationTokenException if token is invalid or expired.
         /// </summary>
-        Task<bool> VerifyEmailAsync(int userId, string tokenHash);
+        Task<bool> VerifyEmailAsync(Guid userUuid, string tokenHash);
 
         /// <summary>
         /// Deletes expired verification tokens and their associated unverified users.
