@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Data;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
@@ -89,6 +90,36 @@ namespace AGRechnung.FunctionApp.Repositories
 
             await tx.CommitAsync();
             return newUserId;
+        }
+
+        public async Task<UserCredentials?> GetUserCredentialsByEmailAsync(string email)
+        {
+            await using var conn = new SqlConnection(_connectionString);
+            await conn.OpenAsync();
+
+            const string sql = @"
+SELECT Id, Email, PasswordHash, PasswordSalt, PasswordHashAlgorithm, VerifiedEmail, Active
+FROM auth.Users
+WHERE Email = @email;";
+
+            await using var cmd = new SqlCommand(sql, conn);
+            cmd.Parameters.Add(new SqlParameter("@email", SqlDbType.NVarChar, 255) { Value = email });
+
+            await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SingleRow);
+            if (!await reader.ReadAsync())
+            {
+                return null;
+            }
+
+            var userId = reader.GetInt32(0);
+            var userEmail = reader.GetString(1);
+            var passwordHash = (byte[])reader["PasswordHash"];
+            var passwordSalt = (byte[])reader["PasswordSalt"];
+            var algorithm = reader.GetString(4);
+            var verified = reader.GetBoolean(5);
+            var active = reader.GetBoolean(6);
+
+            return new UserCredentials(userId, userEmail, passwordHash, passwordSalt, algorithm, verified, active);
         }
 
         public async Task<bool> VerifyEmailAsync(int userId, string tokenHash)

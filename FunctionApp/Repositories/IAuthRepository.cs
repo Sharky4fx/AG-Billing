@@ -13,6 +13,15 @@ namespace AGRechnung.FunctionApp.Repositories
         public InvalidVerificationTokenException() : base("Invalid or expired verification token") { }
     }
 
+    public record UserCredentials(
+        int UserId,
+        string Email,
+        byte[] PasswordHash,
+        byte[] PasswordSalt,
+        string PasswordHashAlgorithm,
+        bool VerifiedEmail,
+        bool Active);
+
     public interface IAuthRepository
     {
         Task<bool> EmailExistsAsync(string email);
@@ -28,6 +37,11 @@ namespace AGRechnung.FunctionApp.Repositories
             string passwordHashAlgorithm,
             string tokenHash,
             DateTime expiresAt);
+
+        /// <summary>
+        /// Retrieves stored credentials for a user by email. Returns null when no user exists.
+        /// </summary>
+        Task<UserCredentials?> GetUserCredentialsByEmailAsync(string email);
 
         /// <summary>
         /// Verifies a user's email using the provided token.

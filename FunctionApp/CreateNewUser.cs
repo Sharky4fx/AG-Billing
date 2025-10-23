@@ -5,6 +5,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
+using AGRechnung.FunctionApp.Security;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
@@ -17,11 +18,6 @@ public class CreateNewUser
 {
     private readonly ILogger<CreateNewUser> _logger;
     private readonly AGRechnung.FunctionApp.Repositories.IAuthRepository _repo;
-
-    private const int PasswordSaltSize = 16;
-    private const int PasswordHashSize = 32;
-    private const int PasswordIterations = 100_000;
-    private const string PasswordAlgorithmDescriptor = "PBKDF2-SHA256-100000";
 
     private record CreateUserRequest(string? Email, string? Password);
 
@@ -76,7 +72,7 @@ public class CreateNewUser
             return new BadRequestObjectResult(new { error = "Invalid email format" });
         }
 
-        var (passwordHash, passwordSalt) = HashPassword(password);
+        var (passwordHash, passwordSalt, passwordAlgorithm) = PasswordHasher.HashPassword(password);
 
         // Generate secure random token (URL-safe base64)
         var token = GenerateUrlSafeToken(32);
@@ -89,7 +85,7 @@ public class CreateNewUser
                 email,
                 passwordHash,
                 passwordSalt,
-                PasswordAlgorithmDescriptor,
+                passwordAlgorithm,
                 tokenHash,
                 expiresAt);
             // Log raw token (will later be sent via Azure Communication)
@@ -118,16 +114,6 @@ public class CreateNewUser
             .Replace('/', '_')
             .TrimEnd('=');
         return token;
-    }
-
-    private static (byte[] Hash, byte[] Salt) HashPassword(string password)
-    {
-        var salt = new byte[PasswordSaltSize];
-        RandomNumberGenerator.Fill(salt);
-
-        using var pbkdf2 = new Rfc2898DeriveBytes(password, salt, PasswordIterations, HashAlgorithmName.SHA256);
-        var hash = pbkdf2.GetBytes(PasswordHashSize);
-        return (hash, salt);
     }
 
     private static bool IsJsonContentType(string? contentType)

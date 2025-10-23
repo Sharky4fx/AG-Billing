@@ -1,6 +1,10 @@
+using System;
 using System.IO;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
+using AGRechnung.FunctionApp.Repositories;
+using AGRechnung.FunctionApp.Security;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -14,7 +18,7 @@ namespace AGRechnung.FunctionApp.Tests
         [Fact]
         public async Task CreateNewUser_ReturnsConflict_WhenEmailExists()
         {
-            var repoMock = new Mock<AGRechnung.FunctionApp.Repositories.IAuthRepository>();
+            var repoMock = new Mock<IAuthRepository>();
             repoMock.Setup(r => r.CreateUserWithVerificationTokenAsync(
                     It.IsAny<string>(),
                     It.IsAny<byte[]>(),
@@ -44,7 +48,7 @@ namespace AGRechnung.FunctionApp.Tests
         [Fact]
         public async Task VerifyEmail_ReturnsOk_WhenTokenValid()
         {
-            var repoMock = new Mock<AGRechnung.FunctionApp.Repositories.IAuthRepository>();
+            var repoMock = new Mock<IAuthRepository>();
             repoMock.Setup(r => r.VerifyEmailAsync(It.IsAny<int>(), It.IsAny<string>()))
                 .ReturnsAsync(true);
 
@@ -64,7 +68,7 @@ namespace AGRechnung.FunctionApp.Tests
         [Fact]
         public async Task VerifyEmail_ReturnsBadRequest_WhenTokenInvalid()
         {
-            var repoMock = new Mock<AGRechnung.FunctionApp.Repositories.IAuthRepository>();
+            var repoMock = new Mock<IAuthRepository>();
             repoMock.Setup(r => r.VerifyEmailAsync(It.IsAny<int>(), It.IsAny<string>()))
                 .ThrowsAsync(new AGRechnung.FunctionApp.Repositories.InvalidVerificationTokenException());
 
@@ -83,7 +87,7 @@ namespace AGRechnung.FunctionApp.Tests
         [Fact]
         public async Task CleanupUnverifiedUsers_LogsResults()
         {
-            var repoMock = new Mock<AGRechnung.FunctionApp.Repositories.IAuthRepository>();
+            var repoMock = new Mock<IAuthRepository>();
             repoMock.Setup(r => r.CleanupUnverifiedUsersAsync())
                 .ReturnsAsync(2); // Simulate 2 users cleaned up
 
@@ -93,6 +97,69 @@ namespace AGRechnung.FunctionApp.Tests
             await func.Run(null); // TimerInfo can be null for testing
 
             repoMock.Verify(r => r.CleanupUnverifiedUsersAsync(), Times.Once);
+        }
+
+        [Fact]
+        public async Task Authenticate_ReturnsToken_WhenCredentialsValid()
+        {
+            var (hash, salt, algorithm) = PasswordHasher.HashPassword("Password123!");
+            var credentials = new UserCredentials(42, "user@example.com", hash, salt, algorithm, true, true);
+
+            var repoMock = new Mock<IAuthRepository>();
+            repoMock.Setup(r => r.GetUserCredentialsByEmailAsync(credentials.Email))
+                .ReturnsAsync(credentials);
+
+            Environment.SetEnvironmentVariable("AuthTokenSigningKey", "supersecretkeysupersecretkey123456");
+            Environment.SetEnvironmentVariable("AuthTokenIssuer", "TestIssuer");
+            Environment.SetEnvironmentVariable("AuthTokenAudience", "TestAudience");
+
+            var logger = NullLogger<AGRechnung.Authenticate.Authenticate>.Instance;
+            var func = new AGRechnung.Authenticate.Authenticate(logger, repoMock.Object);
+
+            var context = new DefaultHttpContext();
+            var req = context.Request;
+            req.Method = "POST";
+            req.ContentType = "application/json";
+            var payload = "{\"email\":\"user@example.com\",\"password\":\"Password123!\"}";
+            var body = new MemoryStream(Encoding.UTF8.GetBytes(payload));
+            req.Body = body;
+            req.ContentLength = body.Length;
+
+            var result = await func.Run(req);
+
+            var ok = Assert.IsType<OkObjectResult>(result);
+            var json = JsonSerializer.Serialize(ok.Value);
+            Assert.Contains("token", json);
+            Assert.Contains("user@example.com", json);
+        }
+
+        [Fact]
+        public async Task Authenticate_ReturnsUnauthorized_WhenPasswordInvalid()
+        {
+            var (hash, salt, algorithm) = PasswordHasher.HashPassword("Password123!");
+            var credentials = new UserCredentials(42, "user@example.com", hash, salt, algorithm, true, true);
+
+            var repoMock = new Mock<IAuthRepository>();
+            repoMock.Setup(r => r.GetUserCredentialsByEmailAsync(credentials.Email))
+                .ReturnsAsync(credentials);
+
+            Environment.SetEnvironmentVariable("AuthTokenSigningKey", "supersecretkeysupersecretkey123456");
+
+            var logger = NullLogger<AGRechnung.Authenticate.Authenticate>.Instance;
+            var func = new AGRechnung.Authenticate.Authenticate(logger, repoMock.Object);
+
+            var context = new DefaultHttpContext();
+            var req = context.Request;
+            req.Method = "POST";
+            req.ContentType = "application/json";
+            var payload = "{\"email\":\"user@example.com\",\"password\":\"WrongPassword\"}";
+            var body = new MemoryStream(Encoding.UTF8.GetBytes(payload));
+            req.Body = body;
+            req.ContentLength = body.Length;
+
+            var result = await func.Run(req);
+
+            Assert.IsType<UnauthorizedObjectResult>(result);
         }
     }
 }
