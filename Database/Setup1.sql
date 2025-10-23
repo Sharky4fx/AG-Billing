@@ -84,13 +84,18 @@ END;
 GO
 
 /* ──────────────────────────────
-   core.Companies
+   core.Companies (merged with CompanyAddresses)
 ──────────────────────────────── */
 CREATE TABLE core.Companies (
     Id          INT IDENTITY(1,1) PRIMARY KEY,
     UserId      INT NOT NULL,
     Name        NVARCHAR(255) NOT NULL,
     VatNumber   NVARCHAR(50) NULL,
+    -- Address fields merged from former core.CompanyAddresses
+    Street      NVARCHAR(255) NOT NULL,
+    PostalCode  NVARCHAR(20)  NOT NULL,
+    City        NVARCHAR(100) NOT NULL,
+    Country     NVARCHAR(100) NOT NULL DEFAULT N'Deutschland',
     CreatedAt   DATETIME2(0) NOT NULL DEFAULT SYSDATETIME(),
     UpdatedAt   DATETIME2(0) NOT NULL DEFAULT SYSDATETIME(),
     CONSTRAINT FK_Companies_Users
@@ -149,38 +154,7 @@ BEGIN
 END;
 GO
 
-/* ──────────────────────────────
-   core.CompanyAddresses
-──────────────────────────────── */
-CREATE TABLE core.CompanyAddresses (
-    Id          INT IDENTITY(1,1) PRIMARY KEY,
-    CompanyId   INT NOT NULL,
-    Street      NVARCHAR(255) NOT NULL,
-    PostalCode  NVARCHAR(20) NOT NULL,
-    City        NVARCHAR(100) NOT NULL,
-    Country     NVARCHAR(100) NOT NULL DEFAULT N'Deutschland',
-    CreatedAt   DATETIME2(0) NOT NULL DEFAULT SYSDATETIME(),
-    UpdatedAt   DATETIME2(0) NOT NULL DEFAULT SYSDATETIME(),
-    CONSTRAINT FK_CompanyAddresses_Companies
-        FOREIGN KEY (CompanyId) REFERENCES core.Companies(Id)
-        ON DELETE CASCADE ON UPDATE CASCADE
-);
-GO
-CREATE INDEX IX_CompanyAddresses_CompanyId ON core.CompanyAddresses(CompanyId);
-GO
-
-CREATE OR ALTER TRIGGER trg_CompanyAddresses_Update
-ON core.CompanyAddresses
-AFTER UPDATE
-AS
-BEGIN
-    SET NOCOUNT ON;
-    UPDATE a
-        SET UpdatedAt = SYSDATETIME()
-    FROM core.CompanyAddresses a
-    INNER JOIN inserted i ON a.Id = i.Id;
-END;
-GO
+-- core.CompanyAddresses removed; address fields now live on core.Companies
 
 /* ──────────────────────────────
    billing.TaxRateTemplates
