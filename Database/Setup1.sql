@@ -26,6 +26,10 @@ CREATE TABLE auth.Users (
     Email         NVARCHAR(255) NOT NULL UNIQUE,
     VerifiedEmail BIT NOT NULL DEFAULT 0,
     Active        BIT NOT NULL DEFAULT 1,
+    PasswordHash  VARBINARY(512) NOT NULL,
+    PasswordSalt  VARBINARY(128) NOT NULL,
+    PasswordHashAlgorithm NVARCHAR(50) NOT NULL DEFAULT N'PBKDF2-SHA256-100000',
+    PasswordSetAt DATETIME2(0) NOT NULL DEFAULT SYSDATETIME(),
     CreatedAt     DATETIME2(0) NOT NULL DEFAULT SYSDATETIME(),
     UpdatedAt     DATETIME2(0) NOT NULL DEFAULT SYSDATETIME()
 );
@@ -109,39 +113,67 @@ END;
 GO
 
 /* ──────────────────────────────
-   core.Addresses
+   core.UserAddresses
 ──────────────────────────────── */
-CREATE TABLE core.Addresses (
+CREATE TABLE core.UserAddresses (
     Id          INT IDENTITY(1,1) PRIMARY KEY,
-    UserId      INT NULL,
-    CompanyId   INT NULL,
+    UserId      INT NOT NULL,
     Street      NVARCHAR(255) NOT NULL,
     PostalCode  NVARCHAR(20) NOT NULL,
     City        NVARCHAR(100) NOT NULL,
     Country     NVARCHAR(100) NOT NULL DEFAULT N'Deutschland',
     CreatedAt   DATETIME2(0) NOT NULL DEFAULT SYSDATETIME(),
     UpdatedAt   DATETIME2(0) NOT NULL DEFAULT SYSDATETIME(),
-    CONSTRAINT FK_Addresses_Users
+    CONSTRAINT FK_UserAddresses_Users
         FOREIGN KEY (UserId) REFERENCES auth.Users(Id)
-        ON DELETE CASCADE ON UPDATE CASCADE,
-    CONSTRAINT FK_Addresses_Companies
-        FOREIGN KEY (CompanyId) REFERENCES core.Companies(Id)
         ON DELETE CASCADE ON UPDATE CASCADE
 );
 GO
-CREATE INDEX IX_Addresses_UserId ON core.Addresses(UserId);
-CREATE INDEX IX_Addresses_CompanyId ON core.Addresses(CompanyId);
+CREATE INDEX IX_UserAddresses_UserId ON core.UserAddresses(UserId);
 GO
 
-CREATE OR ALTER TRIGGER trg_Addresses_Update
-ON core.Addresses
+CREATE OR ALTER TRIGGER trg_UserAddresses_Update
+ON core.UserAddresses
 AFTER UPDATE
 AS
 BEGIN
     SET NOCOUNT ON;
     UPDATE a
         SET UpdatedAt = SYSDATETIME()
-    FROM core.Addresses a
+    FROM core.UserAddresses a
+    INNER JOIN inserted i ON a.Id = i.Id;
+END;
+GO
+
+/* ──────────────────────────────
+   core.CompanyAddresses
+──────────────────────────────── */
+CREATE TABLE core.CompanyAddresses (
+    Id          INT IDENTITY(1,1) PRIMARY KEY,
+    CompanyId   INT NOT NULL,
+    Street      NVARCHAR(255) NOT NULL,
+    PostalCode  NVARCHAR(20) NOT NULL,
+    City        NVARCHAR(100) NOT NULL,
+    Country     NVARCHAR(100) NOT NULL DEFAULT N'Deutschland',
+    CreatedAt   DATETIME2(0) NOT NULL DEFAULT SYSDATETIME(),
+    UpdatedAt   DATETIME2(0) NOT NULL DEFAULT SYSDATETIME(),
+    CONSTRAINT FK_CompanyAddresses_Companies
+        FOREIGN KEY (CompanyId) REFERENCES core.Companies(Id)
+        ON DELETE CASCADE ON UPDATE CASCADE
+);
+GO
+CREATE INDEX IX_CompanyAddresses_CompanyId ON core.CompanyAddresses(CompanyId);
+GO
+
+CREATE OR ALTER TRIGGER trg_CompanyAddresses_Update
+ON core.CompanyAddresses
+AFTER UPDATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+    UPDATE a
+        SET UpdatedAt = SYSDATETIME()
+    FROM core.CompanyAddresses a
     INNER JOIN inserted i ON a.Id = i.Id;
 END;
 GO

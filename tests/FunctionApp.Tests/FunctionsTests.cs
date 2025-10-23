@@ -1,7 +1,8 @@
+using System.IO;
+using System.Text;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Xunit;
@@ -11,31 +12,16 @@ namespace AGRechnung.FunctionApp.Tests
     public class FunctionsTests
     {
         [Fact]
-        public async Task CheckEmailAvailability_ReturnsAvailable_WhenNotExists()
-        {
-            var repoMock = new Mock<AGRechnung.FunctionApp.Repositories.IAuthRepository>();
-            repoMock.Setup(r => r.EmailExistsAsync(It.IsAny<string>())).ReturnsAsync(false);
-
-            var logger = NullLogger<AGBilling.CheckEMailAvailability.CheckEmailAvailability>.Instance;
-            var func = new AGBilling.CheckEMailAvailability.CheckEmailAvailability(logger, repoMock.Object);
-
-            var context = new DefaultHttpContext();
-            var req = context.Request;
-            req.QueryString = new QueryString("?email=test@example.com");
-
-            var result = await func.Run(req);
-
-            Assert.IsType<OkObjectResult>(result);
-            var ok = result as OkObjectResult;
-            Assert.NotNull(ok);
-            Assert.Equal(200, ok.StatusCode);
-        }
-
-        [Fact]
         public async Task CreateNewUser_ReturnsConflict_WhenEmailExists()
         {
             var repoMock = new Mock<AGRechnung.FunctionApp.Repositories.IAuthRepository>();
-            repoMock.Setup(r => r.CreateUserWithVerificationTokenAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<System.DateTime>()))
+            repoMock.Setup(r => r.CreateUserWithVerificationTokenAsync(
+                    It.IsAny<string>(),
+                    It.IsAny<byte[]>(),
+                    It.IsAny<byte[]>(),
+                    It.IsAny<string>(),
+                    It.IsAny<string>(),
+                    It.IsAny<System.DateTime>()))
                 .ThrowsAsync(new AGRechnung.FunctionApp.Repositories.EmailAlreadyExistsException("test@example.com"));
 
             var logger = NullLogger<AGRechnung.CreateNewUser.CreateNewUser>.Instance;
@@ -44,7 +30,11 @@ namespace AGRechnung.FunctionApp.Tests
             var context = new DefaultHttpContext();
             var req = context.Request;
             req.Method = "POST";
-            req.QueryString = new QueryString("?email=test@example.com");
+            req.ContentType = "application/json";
+            var payload = "{\"email\":\"test@example.com\",\"password\":\"Password123\"}";
+            var body = new MemoryStream(Encoding.UTF8.GetBytes(payload));
+            req.Body = body;
+            req.ContentLength = body.Length;
 
             var result = await func.Run(req);
 

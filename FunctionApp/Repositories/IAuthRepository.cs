@@ -18,10 +18,16 @@ namespace AGRechnung.FunctionApp.Repositories
         Task<bool> EmailExistsAsync(string email);
 
         /// <summary>
-        /// Creates a user and a verification token atomically. Returns the new user id.
-        /// Throws EmailAlreadyExistsException when email already exists.
+        /// Creates a user, stores hashed password details, and creates a verification token atomically.
+        /// Returns the new user id. Throws EmailAlreadyExistsException when email already exists.
         /// </summary>
-        Task<int> CreateUserWithVerificationTokenAsync(string email, string tokenHash, DateTime expiresAt);
+        Task<int> CreateUserWithVerificationTokenAsync(
+            string email,
+            byte[] passwordHash,
+            byte[] passwordSalt,
+            string passwordHashAlgorithm,
+            string tokenHash,
+            DateTime expiresAt);
 
         /// <summary>
         /// Verifies a user's email using the provided token.

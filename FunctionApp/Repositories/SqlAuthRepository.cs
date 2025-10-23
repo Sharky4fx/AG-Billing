@@ -27,7 +27,13 @@ namespace AGRechnung.FunctionApp.Repositories
             return int.TryParse(result.ToString(), out var count) && count > 0;
         }
 
-        public async Task<int> CreateUserWithVerificationTokenAsync(string email, string tokenHash, DateTime expiresAt)
+        public async Task<int> CreateUserWithVerificationTokenAsync(
+            string email,
+            byte[] passwordHash,
+            byte[] passwordSalt,
+            string passwordHashAlgorithm,
+            string tokenHash,
+            DateTime expiresAt)
         {
             await using var conn = new SqlConnection(_connectionString);
             await conn.OpenAsync();
@@ -49,14 +55,17 @@ namespace AGRechnung.FunctionApp.Repositories
 
             // Insert user and get id
             const string insertUserSql = @"
-                INSERT INTO auth.Users (Email)
+                INSERT INTO auth.Users (Email, PasswordHash, PasswordSalt, PasswordHashAlgorithm)
                 OUTPUT INSERTED.Id
-                VALUES (@email);
+                VALUES (@email, @passwordHash, @passwordSalt, @passwordHashAlgorithm);
                 ";
             int newUserId;
             await using (var insertCmd = new SqlCommand(insertUserSql, conn, (SqlTransaction)tx))
             {
                 insertCmd.Parameters.Add(new SqlParameter("@email", SqlDbType.NVarChar, 255) { Value = email });
+                insertCmd.Parameters.Add(new SqlParameter("@passwordHash", SqlDbType.VarBinary, passwordHash.Length) { Value = passwordHash });
+                insertCmd.Parameters.Add(new SqlParameter("@passwordSalt", SqlDbType.VarBinary, passwordSalt.Length) { Value = passwordSalt });
+                insertCmd.Parameters.Add(new SqlParameter("@passwordHashAlgorithm", SqlDbType.NVarChar, 50) { Value = passwordHashAlgorithm });
                 var insertedIdObj = await insertCmd.ExecuteScalarAsync();
                 if (insertedIdObj == null || insertedIdObj == DBNull.Value || !int.TryParse(insertedIdObj.ToString(), out newUserId))
                 {

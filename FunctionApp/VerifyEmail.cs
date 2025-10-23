@@ -41,10 +41,7 @@ public class VerifyEmail
 
         try
         {
-            // Hash the token for comparison with stored hash
-            var tokenHash = HashToken(token);
-            
-            await _repo.VerifyEmailAsync(userId, tokenHash);
+            await _repo.VerifyEmailAsync(userId, token);
             
             return new OkObjectResult(new { 
                 verified = true,
@@ -65,16 +62,5 @@ public class VerifyEmail
                 StatusCode = StatusCodes.Status500InternalServerError 
             };
         }
-    }
-
-    private static string HashToken(string token)
-    {
-        using var sha = SHA256.Create();
-        var bytes = Encoding.UTF8.GetBytes(token);
-        var hash = sha.ComputeHash(bytes);
-        var sb = new StringBuilder(hash.Length * 2);
-        foreach (var b in hash)
-            sb.Append(b.ToString("x2"));
-        return sb.ToString();
     }
 }
