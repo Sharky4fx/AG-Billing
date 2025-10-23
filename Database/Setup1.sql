@@ -33,7 +33,6 @@ GO
 CREATE INDEX IX_Users_Email ON auth.Users(Email);
 GO
 
-/* Trigger → auto-update UpdatedAt */
 CREATE OR ALTER TRIGGER trg_Users_Update
 ON auth.Users
 AFTER UPDATE
@@ -54,20 +53,13 @@ CREATE TABLE auth.VerificationTokens (
     Id         INT IDENTITY(1,1) PRIMARY KEY,
     UserId     INT NOT NULL UNIQUE,
     Token      NVARCHAR(255) NOT NULL,
-    ExpiresAt  DATETIME2(0) NOT NULL,
+    ExpiresAt  DATETIME2(0) NOT NULL DEFAULT SYSUTCDATETIME(),
     CreatedAt  DATETIME2(0) NOT NULL DEFAULT SYSDATETIME(),
     UpdatedAt  DATETIME2(0) NOT NULL DEFAULT SYSDATETIME(),
     CONSTRAINT FK_VerificationTokens_Users
         FOREIGN KEY (UserId) REFERENCES auth.Users(Id)
         ON DELETE CASCADE ON UPDATE CASCADE
 );
-GO
--- Ensure ExpiresAt column exists (idempotent for reruns)
-IF COL_LENGTH('auth.VerificationTokens', 'ExpiresAt') IS NULL
-BEGIN
-    ALTER TABLE auth.VerificationTokens
-    ADD ExpiresAt DATETIME2(0) NOT NULL CONSTRAINT DF_VerificationTokens_ExpiresAt DEFAULT SYSUTCDATETIME();
-END;
 GO
 CREATE INDEX IX_VerificationTokens_UserId ON auth.VerificationTokens(UserId);
 GO
