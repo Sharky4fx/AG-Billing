@@ -109,7 +109,7 @@ public class Authenticate
                 token = tokenResult.Token,
                 tokenType = "Bearer",
                 expiresAt = tokenResult.ExpiresAt,
-                user = new { id = user.UserId, email = user.Email }
+                user = new { id = user.UserId, uuid = user.Uuid, email = user.Email }
             });
         }
         catch (InvalidOperationException ex)
@@ -175,9 +175,10 @@ public class Authenticate
 
         var claims = new[]
         {
-            new Claim(JwtRegisteredClaimNames.Sub, user.UserId.ToString()),
+            new Claim(JwtRegisteredClaimNames.Sub, user.Uuid.ToString()),
             new Claim(JwtRegisteredClaimNames.Email, user.Email),
             new Claim("uid", user.UserId.ToString()),
+            new Claim("uuid", user.Uuid.ToString()),
             new Claim("email", user.Email)
         };
 

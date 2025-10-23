@@ -56,13 +56,14 @@ namespace AGRechnung.FunctionApp.Repositories
 
             // Insert user and get id
             const string insertUserSql = @"
-                INSERT INTO auth.Users (Email, PasswordHash, PasswordSalt, PasswordHashAlgorithm)
+                INSERT INTO auth.Users (Uuid, Email, PasswordHash, PasswordSalt, PasswordHashAlgorithm)
                 OUTPUT INSERTED.Id
-                VALUES (@email, @passwordHash, @passwordSalt, @passwordHashAlgorithm);
+                VALUES (@uuid, @email, @passwordHash, @passwordSalt, @passwordHashAlgorithm);
                 ";
             int newUserId;
             await using (var insertCmd = new SqlCommand(insertUserSql, conn, (SqlTransaction)tx))
             {
+                insertCmd.Parameters.Add(new SqlParameter("@uuid", SqlDbType.UniqueIdentifier) { Value = Guid.NewGuid() });
                 insertCmd.Parameters.Add(new SqlParameter("@email", SqlDbType.NVarChar, 255) { Value = email });
                 insertCmd.Parameters.Add(new SqlParameter("@passwordHash", SqlDbType.VarBinary, passwordHash.Length) { Value = passwordHash });
                 insertCmd.Parameters.Add(new SqlParameter("@passwordSalt", SqlDbType.VarBinary, passwordSalt.Length) { Value = passwordSalt });
@@ -98,7 +99,7 @@ namespace AGRechnung.FunctionApp.Repositories
             await conn.OpenAsync();
 
             const string sql = @"
-SELECT Id, Email, PasswordHash, PasswordSalt, PasswordHashAlgorithm, VerifiedEmail, Active
+SELECT Id, Uuid, Email, PasswordHash, PasswordSalt, PasswordHashAlgorithm, VerifiedEmail, Active
 FROM auth.Users
 WHERE Email = @email;";
 
@@ -112,14 +113,15 @@ WHERE Email = @email;";
             }
 
             var userId = reader.GetInt32(0);
-            var userEmail = reader.GetString(1);
+            var uuid = reader.GetGuid(1);
+            var userEmail = reader.GetString(2);
             var passwordHash = (byte[])reader["PasswordHash"];
             var passwordSalt = (byte[])reader["PasswordSalt"];
-            var algorithm = reader.GetString(4);
-            var verified = reader.GetBoolean(5);
-            var active = reader.GetBoolean(6);
+            var algorithm = reader.GetString(5);
+            var verified = reader.GetBoolean(6);
+            var active = reader.GetBoolean(7);
 
-            return new UserCredentials(userId, userEmail, passwordHash, passwordSalt, algorithm, verified, active);
+            return new UserCredentials(userId, uuid, userEmail, passwordHash, passwordSalt, algorithm, verified, active);
         }
 
         public async Task<bool> VerifyEmailAsync(int userId, string tokenHash)

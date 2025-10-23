@@ -23,6 +23,7 @@ GO
 ──────────────────────────────── */
 CREATE TABLE auth.Users (
     Id            INT IDENTITY(1,1) PRIMARY KEY,
+    Uuid          UNIQUEIDENTIFIER NOT NULL CONSTRAINT DF_Users_Uuid DEFAULT NEWSEQUENTIALID(),
     Email         NVARCHAR(255) NOT NULL UNIQUE,
     VerifiedEmail BIT NOT NULL DEFAULT 0,
     Active        BIT NOT NULL DEFAULT 1,
@@ -35,6 +36,7 @@ CREATE TABLE auth.Users (
 );
 GO
 CREATE INDEX IX_Users_Email ON auth.Users(Email);
+CREATE UNIQUE INDEX IX_Users_Uuid ON auth.Users(Uuid);
 GO
 
 CREATE OR ALTER TRIGGER trg_Users_Update
@@ -118,6 +120,8 @@ GO
 CREATE TABLE core.UserAddresses (
     Id          INT IDENTITY(1,1) PRIMARY KEY,
     UserId      INT NOT NULL,
+    FirstName   NVARCHAR(100) NOT NULL,
+    LastName    NVARCHAR(100) NOT NULL,
     Street      NVARCHAR(255) NOT NULL,
     PostalCode  NVARCHAR(20) NOT NULL,
     City        NVARCHAR(100) NOT NULL,

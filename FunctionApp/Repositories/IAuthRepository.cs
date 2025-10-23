@@ -15,6 +15,7 @@ namespace AGRechnung.FunctionApp.Repositories
 
     public record UserCredentials(
         int UserId,
+        Guid Uuid,
         string Email,
         byte[] PasswordHash,
         byte[] PasswordSalt,

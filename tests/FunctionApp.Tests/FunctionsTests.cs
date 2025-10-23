@@ -103,7 +103,7 @@ namespace AGRechnung.FunctionApp.Tests
         public async Task Authenticate_ReturnsToken_WhenCredentialsValid()
         {
             var (hash, salt, algorithm) = PasswordHasher.HashPassword("Password123!");
-            var credentials = new UserCredentials(42, "user@example.com", hash, salt, algorithm, true, true);
+            var credentials = new UserCredentials(42, Guid.NewGuid(), "user@example.com", hash, salt, algorithm, true, true);
 
             var repoMock = new Mock<IAuthRepository>();
             repoMock.Setup(r => r.GetUserCredentialsByEmailAsync(credentials.Email))
@@ -137,7 +137,7 @@ namespace AGRechnung.FunctionApp.Tests
         public async Task Authenticate_ReturnsUnauthorized_WhenPasswordInvalid()
         {
             var (hash, salt, algorithm) = PasswordHasher.HashPassword("Password123!");
-            var credentials = new UserCredentials(42, "user@example.com", hash, salt, algorithm, true, true);
+            var credentials = new UserCredentials(42, Guid.NewGuid(), "user@example.com", hash, salt, algorithm, true, true);
 
             var repoMock = new Mock<IAuthRepository>();
             repoMock.Setup(r => r.GetUserCredentialsByEmailAsync(credentials.Email))

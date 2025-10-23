@@ -1,24 +1,29 @@
 USE AGRechnungDev;
 GO
 
-IF OBJECT_ID('sales.OfferServices', 'U')       IS NOT NULL DROP TABLE sales.OfferServices;
-IF OBJECT_ID('sales.Offers', 'U')              IS NOT NULL DROP TABLE sales.Offers;
-IF OBJECT_ID('sales.ServiceTemplates', 'U')    IS NOT NULL DROP TABLE sales.ServiceTemplates;
-IF OBJECT_ID('sales.Services', 'U')            IS NOT NULL DROP TABLE sales.Services;
+-- Sales (most dependent first)
+IF OBJECT_ID('sales.OfferServices', 'U')      IS NOT NULL DROP TABLE sales.OfferServices;
+IF OBJECT_ID('sales.Offers', 'U')             IS NOT NULL DROP TABLE sales.Offers;
+IF OBJECT_ID('sales.ServiceTemplates', 'U')   IS NOT NULL DROP TABLE sales.ServiceTemplates;
+IF OBJECT_ID('sales.Services', 'U')           IS NOT NULL DROP TABLE sales.Services;
 
-IF OBJECT_ID('billing.PaymentReminders', 'U')  IS NOT NULL DROP TABLE billing.PaymentReminders;
-IF OBJECT_ID('billing.Bills', 'U')             IS NOT NULL DROP TABLE billing.Bills;
-IF OBJECT_ID('billing.TaxRates', 'U')          IS NOT NULL DROP TABLE billing.TaxRates;
-IF OBJECT_ID('billing.TaxRateTemplates', 'U')  IS NOT NULL DROP TABLE billing.TaxRateTemplates;
+-- Billing
+IF OBJECT_ID('billing.PaymentReminders', 'U') IS NOT NULL DROP TABLE billing.PaymentReminders;
+IF OBJECT_ID('billing.Bills', 'U')            IS NOT NULL DROP TABLE billing.Bills;
+IF OBJECT_ID('billing.TaxRates', 'U')         IS NOT NULL DROP TABLE billing.TaxRates;
+IF OBJECT_ID('billing.TaxRateTemplates', 'U') IS NOT NULL DROP TABLE billing.TaxRateTemplates;
 
-IF OBJECT_ID('core.Addresses', 'U')           IS NOT NULL DROP TABLE core.Addresses;
+-- Core
+IF OBJECT_ID('core.CompanyAddresses', 'U')    IS NOT NULL DROP TABLE core.CompanyAddresses;
+IF OBJECT_ID('core.UserAddresses', 'U')       IS NOT NULL DROP TABLE core.UserAddresses;
 IF OBJECT_ID('core.Companies', 'U')           IS NOT NULL DROP TABLE core.Companies;
 
+-- Auth
 IF OBJECT_ID('auth.VerificationTokens', 'U')  IS NOT NULL DROP TABLE auth.VerificationTokens;
 IF OBJECT_ID('auth.Users', 'U')               IS NOT NULL DROP TABLE auth.Users;
 GO
 
-
+-- Drop schemas
 IF EXISTS (SELECT 1 FROM sys.schemas WHERE name = 'sales')   DROP SCHEMA sales;
 IF EXISTS (SELECT 1 FROM sys.schemas WHERE name = 'billing') DROP SCHEMA billing;
 IF EXISTS (SELECT 1 FROM sys.schemas WHERE name = 'core')    DROP SCHEMA core;
