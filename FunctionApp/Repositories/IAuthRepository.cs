@@ -55,5 +55,17 @@ namespace AGRechnung.FunctionApp.Repositories
         /// Returns the number of users cleaned up.
         /// </summary>
         Task<int> CleanupUnverifiedUsersAsync();
+
+        /// <summary>
+        /// Gets the user UUID and existing verification token (if any) for resending.
+        /// Returns tuple with (uuid, existingTokenHash, expiresAt) or null if user not found or already verified.
+        /// </summary>
+        Task<(Guid Uuid, string TokenHash, DateTime ExpiresAt)?> GetVerificationTokenForResendAsync(string email);
+
+        /// <summary>
+        /// Updates or creates a verification token for an existing unverified user.
+        /// Used when resending verification emails.
+        /// </summary>
+        Task UpdateVerificationTokenAsync(string email, string newTokenHash, DateTime expiresAt);
     }
 }

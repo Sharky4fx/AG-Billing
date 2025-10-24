@@ -11,3 +11,6 @@
 .vs/
 .vscode/
 *.DS_Store
+
+# Azure Functions local settings (contains secrets)
+local.settings.json

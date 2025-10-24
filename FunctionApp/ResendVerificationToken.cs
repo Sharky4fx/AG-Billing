@@ -6,125 +6,97 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
-using AGRechnung.FunctionApp.Security;
+using AGRechnung.FunctionApp.Repositories;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Logging;
 using Azure;
 using Azure.Communication.Email;
-// using Microsoft.Data.SqlClient; (not needed - repository handles DB access)
 
-namespace AGRechnung.CreateNewUser;
+namespace AGRechnung.ResendVerificationToken;
 
-public class CreateNewUser
+public class ResendVerificationToken
 {
-    private readonly ILogger<CreateNewUser> _logger;
-    private readonly AGRechnung.FunctionApp.Repositories.IAuthRepository _repo;
+    private readonly ILogger<ResendVerificationToken> _logger;
+    private readonly IAuthRepository _repo;
 
-    private record CreateUserRequest(string? Email, string? Password);
+    private record ResendRequest(string? Email);
 
-    public CreateNewUser(ILogger<CreateNewUser> logger, AGRechnung.FunctionApp.Repositories.IAuthRepository repo)
+    public ResendVerificationToken(ILogger<ResendVerificationToken> logger, IAuthRepository repo)
     {
         _logger = logger;
         _repo = repo;
     }
 
-    [Function("CreateNewUser")]
+    [Function("ResendVerificationToken")]
     public async Task<IActionResult> Run([HttpTrigger(AuthorizationLevel.Function, "post")] HttpRequest req)
     {
-        _logger.LogInformation("CreateNewUser function processed a request.");
+        _logger.LogInformation("ResendVerificationToken function processed a request.");
 
         string? email = null;
-        string? password = null;
 
         if (req.HasFormContentType)
         {
             var form = await req.ReadFormAsync();
             email = form["email"].ToString();
-            password = form["password"].ToString();
         }
         else if (IsJsonContentType(req.ContentType))
         {
             var payload = await DeserializeBodyAsync(req);
             email = payload?.Email;
-            password = payload?.Password;
         }
 
         email ??= req.Query["email"].ToString();
-        password ??= req.Query["password"].ToString();
 
         if (string.IsNullOrWhiteSpace(email))
         {
             return new BadRequestObjectResult(new { error = "Missing 'email' value" });
         }
 
-        if (string.IsNullOrWhiteSpace(password))
-        {
-            return new BadRequestObjectResult(new { error = "Missing 'password' value" });
-        }
-
-        if (password.Length < 8)
-        {
-            return new BadRequestObjectResult(new { error = "Password must be at least 8 characters" });
-        }
-
-        // Normalize input email for validation and uniqueness checks
+        // Normalize email
         email = email.Trim();
-
         var emailValidator = new EmailAddressAttribute();
         if (!emailValidator.IsValid(email))
         {
             return new BadRequestObjectResult(new { error = "Invalid email format" });
         }
 
-        // Best-practice normalization for uniqueness: lowercase and trimmed
         var normalizedEmail = email.ToLowerInvariant();
-
-        var (passwordHash, passwordSalt, passwordAlgorithm) = PasswordHasher.HashPassword(password);
-
-        // Generate secure random token (URL-safe base64)
-        var token = GenerateUrlSafeToken(32);
-        var tokenHash = HashToken(token);
-        var expiresAt = DateTime.UtcNow.AddHours(24);
 
         try
         {
-            var newUserId = await _repo.CreateUserWithVerificationTokenAsync(
-                normalizedEmail,
-                passwordHash,
-                passwordSalt,
-                passwordAlgorithm,
-                tokenHash,
-                expiresAt);
-            
-            // Get user UUID for verification link
-            var userCreds = await _repo.GetUserCredentialsByEmailAsync(normalizedEmail);
-            if (userCreds is null)
+            // Get existing verification token info
+            var tokenInfo = await _repo.GetVerificationTokenForResendAsync(normalizedEmail);
+            if (tokenInfo is null)
             {
-                _logger.LogError("Failed to retrieve newly created user");
-                return new ObjectResult(new { error = "Internal server error" }) { StatusCode = StatusCodes.Status500InternalServerError };
+                // User not found, already verified, or doesn't have a token
+                // Return success for security (don't reveal if email exists)
+                return new OkObjectResult(new { sent = true, message = "If the email exists and is unverified, a verification link has been sent." });
             }
+
+            // Generate new token
+            var newToken = GenerateUrlSafeToken(32);
+            var newTokenHash = HashToken(newToken);
+            var expiresAt = DateTime.UtcNow.AddHours(24);
+
+            // Update token in DB
+            await _repo.UpdateVerificationTokenAsync(normalizedEmail, newTokenHash, expiresAt);
 
             // Send verification email
-            var emailSent = await SendVerificationEmailAsync(normalizedEmail, userCreds.Uuid, token);
+            var emailSent = await SendVerificationEmailAsync(normalizedEmail, tokenInfo.Value.Uuid, newToken);
             if (!emailSent)
             {
-                _logger.LogWarning("User created but email sending failed for {email}", normalizedEmail);
-                // Continue - user created successfully, they can resend verification later
+                _logger.LogWarning("Token updated but email sending failed for {email}", normalizedEmail);
+                return new ObjectResult(new { error = "Failed to send email" }) { StatusCode = StatusCodes.Status500InternalServerError };
             }
 
-            // Do not log the raw token; just indicate that the token was generated
-            _logger.LogInformation("Verification token generated for {email}", normalizedEmail);
-            return new ObjectResult(new { created = true, userId = newUserId }) { StatusCode = StatusCodes.Status201Created };
-        }
-        catch (AGRechnung.FunctionApp.Repositories.EmailAlreadyExistsException)
-        {
-            return new ConflictObjectResult(new { error = "Email already exists" });
+            _logger.LogInformation("Verification email resent to {email}", normalizedEmail);
+            return new OkObjectResult(new { sent = true, message = "Verification email has been sent." });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error creating user");
+            _logger.LogError(ex, "Error resending verification token for {email}", normalizedEmail);
             return new ObjectResult(new { error = "Internal server error" }) { StatusCode = StatusCodes.Status500InternalServerError };
         }
     }
@@ -134,7 +106,6 @@ public class CreateNewUser
         var bytes = new byte[bytesLength];
         using var rng = RandomNumberGenerator.Create();
         rng.GetBytes(bytes);
-        // Base64 URL-safe
         var token = Convert.ToBase64String(bytes)
             .Replace('+', '-')
             .Replace('/', '_')
@@ -148,7 +119,7 @@ public class CreateNewUser
             && contentType.Contains("application/json", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static async Task<CreateUserRequest?> DeserializeBodyAsync(HttpRequest req)
+    private static async Task<ResendRequest?> DeserializeBodyAsync(HttpRequest req)
     {
         if (req.Body == null)
         {
@@ -171,7 +142,7 @@ public class CreateNewUser
 
         try
         {
-            return JsonSerializer.Deserialize<CreateUserRequest>(body, new JsonSerializerOptions
+            return JsonSerializer.Deserialize<ResendRequest>(body, new JsonSerializerOptions
             {
                 PropertyNameCaseInsensitive = true
             });
@@ -201,8 +172,8 @@ public class CreateNewUser
             var senderAddress = Environment.GetEnvironmentVariable("Email__SenderAddress");
             var baseUrl = Environment.GetEnvironmentVariable("VerifyEmail__BaseUrl");
 
-            if (string.IsNullOrWhiteSpace(connectionString) || 
-                string.IsNullOrWhiteSpace(senderAddress) || 
+            if (string.IsNullOrWhiteSpace(connectionString) ||
+                string.IsNullOrWhiteSpace(senderAddress) ||
                 string.IsNullOrWhiteSpace(baseUrl))
             {
                 _logger.LogError("Email configuration missing (COMMUNICATION_SERVICES_CONNECTION_STRING, Email__SenderAddress, or VerifyEmail__BaseUrl)");

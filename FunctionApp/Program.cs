@@ -18,4 +18,9 @@ builder.Services.AddSingleton<AGRechnung.FunctionApp.Repositories.IAuthRepositor
     return new AGRechnung.FunctionApp.Repositories.SqlAuthRepository(sqlConn);
 });
 
+builder.Services.AddSingleton<AGRechnung.FunctionApp.Repositories.ICompanyRepository>(sp =>
+{
+    return new AGRechnung.FunctionApp.Repositories.SqlCompanyRepository(sqlConn);
+});
+
 builder.Build().Run();

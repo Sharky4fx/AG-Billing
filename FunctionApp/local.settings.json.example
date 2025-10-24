@@ -1,0 +1,19 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "",
+    "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
+    "SqlConnection": "Data Source=YOUR_SERVER;Initial Catalog=AGRechnungDev;User ID=YOUR_USER;Password=YOUR_PASSWORD;Pooling=False;Connect Timeout=30;Encrypt=True;Trust Server Certificate=True;Authentication=SqlPassword;",
+    "AuthTokenSigningKey": "GENERATE_A_STRONG_256_BIT_KEY_HERE_USE_openssl_rand_base64_32",
+    "COMMUNICATION_SERVICES_CONNECTION_STRING": "endpoint=https://YOUR_ACS_NAME.communication.azure.com/;accesskey=YOUR_ACCESS_KEY_HERE",
+    "Email__SenderAddress": "DoNotReply@YOUR_DOMAIN.azurecomm.net",
+    "VerifyEmail__BaseUrl": "http://localhost:7071/api",
+    "Jwt__Issuer": "AGRechnung",
+    "Jwt__Audience": "AGRechnungClients",
+    "Jwt__SigningKey": "SAME_AS_AuthTokenSigningKey_OR_SEPARATE_KEY_FOR_JWT"
+  },
+  "Host": 
+  {
+    "CORS": "http://localhost:8000,https://yourdomain.com"
+  }
+}

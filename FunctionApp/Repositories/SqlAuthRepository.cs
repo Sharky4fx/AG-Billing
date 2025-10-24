@@ -244,5 +244,83 @@ WHERE Id = @userId AND VerifiedEmail = 0;";
                 throw;
             }
         }
+
+        public async Task<(Guid Uuid, string TokenHash, DateTime ExpiresAt)?> GetVerificationTokenForResendAsync(string email)
+        {
+            await using var conn = new SqlConnection(_connectionString);
+            await conn.OpenAsync();
+
+            const string sql = @"
+SELECT u.Uuid, vt.Token, vt.ExpiresAt
+FROM auth.Users u
+INNER JOIN auth.VerificationTokens vt ON vt.UserId = u.Id
+WHERE u.Email = @email AND u.VerifiedEmail = 0;";
+
+            await using var cmd = new SqlCommand(sql, conn);
+            cmd.Parameters.Add(new SqlParameter("@email", SqlDbType.NVarChar, 255) { Value = email });
+
+            await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SingleRow);
+            if (!await reader.ReadAsync())
+            {
+                return null;
+            }
+
+            var uuid = reader.GetGuid(0);
+            var tokenHash = reader.GetString(1);
+            var expiresAt = reader.GetDateTime(2);
+            return (uuid, tokenHash, expiresAt);
+        }
+
+        public async Task UpdateVerificationTokenAsync(string email, string newTokenHash, DateTime expiresAt)
+        {
+            await using var conn = new SqlConnection(_connectionString);
+            await conn.OpenAsync();
+
+            using var tx = conn.BeginTransaction();
+
+            try
+            {
+                // Get user ID
+                const string getUserSql = "SELECT Id FROM auth.Users WHERE Email = @email AND VerifiedEmail = 0;";
+                int userId;
+                await using (var getUserCmd = new SqlCommand(getUserSql, conn, tx))
+                {
+                    getUserCmd.Parameters.Add(new SqlParameter("@email", SqlDbType.NVarChar, 255) { Value = email });
+                    var result = await getUserCmd.ExecuteScalarAsync();
+                    if (result == null || result == DBNull.Value)
+                    {
+                        throw new InvalidOperationException("User not found or already verified");
+                    }
+                    userId = Convert.ToInt32(result);
+                }
+
+                // Update or insert verification token
+                const string updateTokenSql = @"
+UPDATE auth.VerificationTokens 
+SET Token = @token, ExpiresAt = @expiresAt, UpdatedAt = SYSDATETIME()
+WHERE UserId = @userId;
+
+IF @@ROWCOUNT = 0
+BEGIN
+    INSERT INTO auth.VerificationTokens (UserId, Token, ExpiresAt)
+    VALUES (@userId, @token, @expiresAt);
+END";
+
+                await using (var updateCmd = new SqlCommand(updateTokenSql, conn, tx))
+                {
+                    updateCmd.Parameters.Add(new SqlParameter("@userId", SqlDbType.Int) { Value = userId });
+                    updateCmd.Parameters.Add(new SqlParameter("@token", SqlDbType.NVarChar, 255) { Value = newTokenHash });
+                    updateCmd.Parameters.Add(new SqlParameter("@expiresAt", SqlDbType.DateTime2) { Value = expiresAt });
+                    await updateCmd.ExecuteNonQueryAsync();
+                }
+
+                await tx.CommitAsync();
+            }
+            catch (Exception)
+            {
+                await tx.RollbackAsync();
+                throw;
+            }
+        }
     }
 }
